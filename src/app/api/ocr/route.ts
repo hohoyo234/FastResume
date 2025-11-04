@@ -55,7 +55,29 @@ async function ocrPdfBuffer(buf: Buffer, pages: number, lang: OcrLang): Promise<
   const langParam = lang === "auto" ? "eng+chi_sim" : lang;
 
   // Use CDN for lang/core on server side (browser CSP no longer applies)
-  const langPath = "https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0";
+  // Add multiple mirrors to improve accessibility from different regions.
+  const langCDNs: string[] = [
+    "https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0",
+    "https://fastly.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0",
+    "https://gcore.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0",
+  ];
+
+  async function recognizeWithFallback(imgBuf: Buffer, langParam: string) {
+    let lastError: any = null;
+    for (const base of langCDNs) {
+      try {
+        const res = await TesseractMod.recognize(imgBuf, langParam, { langPath: base });
+        return res;
+      } catch (e: any) {
+        lastError = e;
+        // Try next CDN mirror
+        continue;
+      }
+    }
+    if (lastError) throw lastError;
+    // Fallback: attempt once without explicit langPath
+    return await TesseractMod.recognize(imgBuf, langParam);
+  }
 
   let textAll = "";
   const canvasFactory = new NodeCanvasFactory();
@@ -69,7 +91,7 @@ async function ocrPdfBuffer(buf: Buffer, pages: number, lang: OcrLang): Promise<
       await page.render({ canvasContext: context, viewport, canvasFactory }).promise;
       // @napi-rs/canvas: toBuffer returns PNG by default
       const imgBuf: Buffer = (canvas as any).toBuffer("image/png");
-      const result = await TesseractMod.recognize(imgBuf, langParam, { langPath });
+      const result = await recognizeWithFallback(imgBuf, langParam);
       const pageText: string = result?.data?.text || result?.text || "";
       textAll += (pageText || "") + "\n\n";
     } catch (e: any) {
