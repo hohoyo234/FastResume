@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Ensure native module is treated as external in server bundles
+  serverExternalPackages: ["@napi-rs/canvas"],
 };
 
 export default nextConfig;
