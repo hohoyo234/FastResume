@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "regions": ["hkg1", "sin1"],
+  "functions": {
+    "api/**/*": {
+      "regions": ["hkg1", "sin1"]
+    }
+  }
+}
